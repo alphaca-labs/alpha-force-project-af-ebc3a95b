@@ -5,7 +5,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
-    "analyze": "ANALYZE=true pnpm build"
+    "analyze": "ANALYZE=true pnpm build",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -25,7 +26,10 @@
     "react-hook-form": "^7.68.0",
     "sonner": "^2.0.7",
     "swiper": "^12.0.3",
-    "zod": "^4.2.1"
+    "zod": "^4.2.1",
+    "@repo/domain": "workspace:*",
+    "@repo/security": "workspace:*",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

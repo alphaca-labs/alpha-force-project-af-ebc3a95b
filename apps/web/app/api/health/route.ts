@@ -10,6 +10,14 @@
 // 컨테이너에는 env 가 1건도 주입되지 않는다. 데이터베이스·외부 서비스를 참조하는
 // 순간 앱은 멀쩡한데 배포만 실패하는 상태가 만들어진다.
 // 리다이렉트도 금지 — 프로브가 `redirect:"manual"` + `response.ok` 라 3xx 는 실패다.
+//
+// `instance` 는 «지금 응답한 프로세스가 누구인가» 를 알려 준다. 여러 인스턴스가 떠 있는
+// 배포에서 어느 쪽이 답했는지 가르고, 로컬 스모크는 이 값으로 **검증 대상 서버의 소유권**을
+// 확인한다(고정 포트에 남아 있던 다른 서버의 200 을 준비 완료로 오인하지 않기 위해서다).
 export function GET() {
-  return Response.json({ service: "web", status: "ok" });
+  return Response.json({
+    service: "web",
+    status: "ok",
+    instance: process.env.APP_INSTANCE_ID ?? null,
+  });
 }
