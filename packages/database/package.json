@@ -1,0 +1,42 @@
+{
+  "name": "@repo/database",
+  "version": "0.0.0",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./node": {
+      "types": "./node.ts",
+      "default": "./node.ts"
+    },
+    "./package.json": "./package.json",
+    "./*": "./*.ts",
+    "./*.ts": "./*.ts"
+  },
+  "scripts": {
+    "build": "prisma generate --no-hints",
+    "studio": "NODE_TLS_REJECT_UNAUTHORIZED=0 prisma studio"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.1.0",
+    "@prisma/client": "7",
+    "@t3-oss/env-nextjs": "^0.13.10",
+    "pg": "^8.16.3",
+    "server-only": "^0.0.1",
+    "undici": "^7.16.0",
+    "ws": "^8.18.3",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "25.0.2",
+    "@types/pg": "^8.16.0",
+    "@types/ws": "^8.18.1",
+    "bufferutil": "^4.0.9",
+    "prisma": "7",
+    "typescript": "^5.9.3"
+  }
+}

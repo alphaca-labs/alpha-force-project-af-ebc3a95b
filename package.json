@@ -1,0 +1,61 @@
+{
+  "name": "omniseed",
+  "version": "0.0.2",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "web": "turbo dev --filter web",
+    "admin": "turbo dev --filter admin",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "analyze": "turbo analyze",
+    "bump-deps": "npx npm-check-updates --deep -u -x react-day-picker && pnpm install",
+    "bump-ui": "npx shadcn@latest add --all --overwrite -c packages/design-system",
+    "migrate": "cd packages/database && npx prisma format && npx prisma generate && npx prisma db push",
+    "studio": "cd packages/database && NODE_TLS_REJECT_UNAUTHORIZED=0 npx prisma studio",
+    "clean": "git clean -xdf node_modules",
+    "gen:api-web": "cd apps/web && pnpm orval --config ./orval.config.ts",
+    "gen:api-admin": "cd apps/admin && pnpm orval --config ./orval.config.ts"
+  },
+  "devDependencies": {
+    "@auto-it/all-contributors": "^11.3.6",
+    "@auto-it/first-time-contributor": "^11.3.6",
+    "@eslint/js": "^9.39.4",
+    "@repo/typescript-config": "workspace:*",
+    "@turbo/gen": "^2.6.3",
+    "@types/node": "^25.0.2",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "tsup": "^8.5.1",
+    "turbo": "^2.6.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.2"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.26.0",
+  "type": "module",
+  "dependencies": {
+    "tailwindcss": "^4.1.18"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "19.2.7",
+      "@types/react-dom": "19.2.3"
+    },
+    "ignoredBuiltDependencies": [
+      "@prisma/engines",
+      "@swc/core",
+      "bufferutil",
+      "core-js-pure",
+      "esbuild",
+      "prisma",
+      "sharp"
+    ]
+  }
+}
