@@ -1,184 +1,107 @@
-# Omniseed
+# 뭐해야집사냐?
 
-Turborepo 기반의 풀스택 모노레포 프로젝트입니다. pnpm 워크스페이스와 Turbo를 활용해 여러 애플리케이션과 공유 패키지를 한 곳에서 관리합니다.
+원하는 집과 지금의 재정 조건을 넣으면 **자금 격차·예상 기간·실행 로드맵**을 계산해 주는 서비스입니다.
+회원가입 없이 쓰고, 결과는 픽셀 캐릭터가 붙은 세로형 이미지와 추측 불가능한 공유 링크로 남길 수 있습니다.
 
-## 개요
+요구사항 정본은 `docs/ref/prd/` 의 PRD 10개 문서(FR-001~037, FLOW-001~005)입니다. 문서와 코드가
+어긋나면 PRD가 우선입니다.
 
-Omniseed는 웹(`web`)·어드민(`admin`) 애플리케이션과 Fastify API(`api`), React Router v7 프론트엔드(`frontend`)를 중심으로, 디자인 시스템·데이터베이스·API 클라이언트 등 재사용 가능한 패키지를 함께 제공하는 모노레포 보일러플레이트입니다.
+## 무엇을 하는가
 
-- **모노레포 도구**: Turbo + pnpm workspaces
-- **언어 / 런타임**: TypeScript, Node.js ≥ 24
-- **프론트엔드**: Next.js (`web`/`admin`), React Router v7 (`frontend`)
-- **백엔드 API**: Fastify v5 (`api`, tRPC + REST 하이브리드)
-- **DB / ORM**: Prisma (`packages/database`)
-- **UI**: Tailwind CSS v4, shadcn 기반 디자인 시스템
-- **API 클라이언트 생성**: Orval
-- **템플릿 프루닝**: Bootstrap 스크립트(flavor별 초기 구성)
-- **코드 품질**: ESLint 9, Prettier
+**고객(비로그인)**
 
-## 기술 스택
+1. `/` 목표 집을 고른다 — 추천 최대 8개, 2자 이상 검색 최대 20개, 평형별 대표 시세
+2. `/finance` 보유 자산·연소득·월 저축·기존 대출을 원 단위로 넣는다
+3. `/result` 부족 자금·달성률·예상 기간·캐릭터·절망 지수·우회 카드 4종을 본다.
+   같은 화면에서 월 저축·연소득·평형을 바꾸면 다시 계산한다
+4. `/roadmap` 상품별 적격·부적격·확인 필요 판정과 조달 조합, 5단계 미션을 받는다
+5. `/checklist` 주간·월간 미션을 브라우저에 저장하며 실행한다
+6. `/share/[token]` 생성 당시 결과를 그대로 보존한 링크를 공유한다
 
-| 영역 | 사용 기술 |
-| --- | --- |
-| 패키지 매니저 | pnpm 10.26.0 |
-| 빌드 오케스트레이션 | Turbo 2.x |
-| 프론트엔드 | Next.js (web/admin, eslint-config-next 16), React Router v7 (frontend, Vite + SSR), React 19 |
-| 백엔드 API | Fastify v5 (CommonJS, tsup 빌드, tRPC + REST 하이브리드) |
-| 스타일링 | Tailwind CSS 4, prettier-plugin-tailwindcss |
-| 데이터베이스 | Prisma 7 (하이브리드 클라이언트) |
-| 번들러 | tsup 8 |
-| 자동화 | Auto (릴리스/체인지로그) |
+**운영자(이메일 + TOTP 2단계 인증)**
 
-## 사전 요구사항
+- `/properties` 매물·면적별 시세 상태 · `/properties/[id]/areas/[id]` 확정 시세 편집과 이력
+- `/rules` 대출 규칙 버전 · `/rules/[id]` 새 버전 작성(기존 버전 불변, 기간 충돌 차단)
+- `/admins` 초대·역할·비활성화 · `/audit-logs` 변경 이력(읽기 전용)
 
-- Node.js **24 이상**
-- pnpm **10.26.0** (`corepack enable` 후 자동 설치 권장)
-- (옵션) Prisma 사용 시 환경 변수 `DATABASE_URL` 설정
+## 계산 계약 (요약)
 
-## 설치
+- 대표 시세: 취소되지 않은 거래의 **최근 6개월 중위가격** → 없으면 12개월 → 그래도 없으면 `시세 확인 불가`.
+  유효기간 안의 운영자 확정 시세가 자동값보다 우선한다.
+- 예상 대출 한도: `min(담보가치×LTV, DSR 잔여 상환여력의 원금 환산, 상품 최대 한도)`.
+  상호 배타 상품은 가장 큰 하나만, 병행 가능한 상품만 합산한다.
+- 부족 자금 `max(시세 − 자산 − 대출, 0)` · 달성률 `min((자산+대출)/시세×100, 100)` (소수 첫째 자리)
+- 예상 기간 `ceil(부족 자금 / 월 저축)` — 0원은 즉시 가능, 월 저축 0원은 계산 불가, 1,200개월 이상은 `100년 이상`
+- 캐릭터: 12개월 이하 여유 / 초과~1,200개월 미만 영끌 노력 / 1,200개월 이상·계산 불가 이번 생 불가
+- 취득세·중개보수·이사비, 집값 상승, 저축 이자, 투자 수익은 계산에서 빼고 화면에 명시한다.
+
+전부 `packages/domain` 의 순수 함수이고 `packages/domain/src/simulate.test.ts` 42건이 경계값까지 고정한다.
+
+## 구조
+
+```
+apps/web      고객 화면 (Next.js 16 App Router, 포트 3000)
+apps/admin    운영 백오피스 (Next.js 16, DB 세션 + TOTP, 포트 3001)
+apps/email    React Email 미리보기 (로컬 dev 전용 — apps/email/README.md 참조)
+packages/domain     계산 엔진 (시세·대출·격차·로드맵·공유 지문) — 순수 TS
+packages/security   비밀번호(scrypt)·TOTP·토큰·유출 검사 — node:crypto 만 사용
+packages/database   Prisma 스키마와 클라이언트 (모든 DB 접근의 단일 출처)
+packages/design-system  shadcn/Radix 기반 공용 UI
+scripts/smoke.mjs   실제 프로세스 부팅 + 실제 브라우저 주요 경로 스모크
+docs/ref/prd/       PRD 원문 (바이트 변경 금지)
+```
+
+## 시작하기
 
 ```bash
-# 저장소 클론
-git clone https://github.com/alphaca-labs/omniseed.git
-cd omniseed
-
-# 의존성 설치
+corepack enable
 pnpm install
+
+# 데이터베이스
+export DATABASE_URL="postgresql://user:password@localhost:5432/zipsanya"
+pnpm --filter @repo/database build   # prisma generate
+pnpm --filter @repo/database push    # prisma db push
+pnpm db:seed                         # 매물·시세·대출 규칙·초기 운영자
+
+# 실행
+pnpm web      # http://localhost:3000
+pnpm admin    # http://localhost:3001
 ```
 
-## 사용법
+`apps/admin` 은 `AUTH_ENCRYPTION_KEY`(16자 이상)가 반드시 필요합니다. TOTP secret 저장 암호화 키이고,
+값이 바뀌면 기존 secret 을 복호화할 수 없습니다. 초대·재설정 메일은 `RESEND_TOKEN` 이 있을 때만 발송하고,
+없으면 **발송하지 않되 «보냈다»고 표시하지도 않습니다.**
 
-### 개발 서버 실행
+시드가 만든 초기 운영자는 `SETUP_REQUIRED` 상태입니다. 첫 로그인에서 비밀번호를 새로 정하고 인증 앱을
+등록해야 운영 화면이 열립니다(`SEED_ADMIN_EMAIL`·`SEED_ADMIN_PASSWORD` 로 바꿀 수 있습니다).
+
+## 검증
 
 ```bash
-# 전체 앱 동시 실행
-pnpm dev
-
-# 개별 앱 실행
-pnpm web        # apps/web        (port 3000, Next.js)
-pnpm admin      # apps/admin      (port 3001, Next.js)
-pnpm frontend   # apps/frontend   (port 3003, React Router v7)
-pnpm mobile     # apps/mobile     (Flutter — flutter run, Flutter SDK 필요)
+pnpm build       # 전체 빌드
+pnpm typecheck   # 전 패키지 tsc
+pnpm test        # 계산 엔진 42건 + 보안 12건
+pnpm lint        # ESLint
+pnpm smoke       # 실제 부팅 + 실제 브라우저 주요 경로 37건
 ```
 
-> `apps/api`(Fastify v5, port **3002**)는 `pnpm dev`로 함께 기동됩니다. `apps/frontend`는 `@repo` 의존성 없이 API와 HTTP로 통신하는 자체 완결형 앱입니다.
+`pnpm smoke` 는 `DATABASE_URL`·`AUTH_ENCRYPTION_KEY` 가 필요하고, 시드된 DB를 씁니다.
+고정 포트를 신뢰하지 않고 OS가 배정한 포트를 쓰며, `/api/health` 응답의 `instance` 가 이번 실행이 주입한
+토큰과 **바이트 단위로 같을 때만** 준비 완료로 인정합니다(다른 서버의 200을 오인하지 않기 위해서입니다).
+검사 뒤 초기 운영자 상태를 되돌리므로 연속 재실행이 됩니다.
 
-### 빌드 / 린트
+`pnpm build → pnpm typecheck → pnpm test` 는 **직렬로** 돌리세요. 같은 Next.js 앱의 build 와 tsc 는
+`.next/types` 를 공유해 병렬 실행하면 TS6053 경합이 납니다.
 
-```bash
-pnpm build         # 전체 빌드 (turbo build)
-pnpm lint          # ESLint 검사
-pnpm format        # Prettier 적용
-pnpm format:check  # 포맷팅 검증
-pnpm analyze       # 번들 분석
-```
+## 지키는 것
 
-### 데이터베이스 (Prisma)
-
-```bash
-pnpm migrate   # prisma format + generate + db push
-pnpm studio    # Prisma Studio 실행
-```
-
-DB 접근은 소비자 환경에 따라 진입점이 다릅니다.
-
-- `import { database } from '@repo/database'` — Next.js RSC 전용(server-only).
-- `import { database } from '@repo/database/node'` — 일반 Node 소비자(Fastify api·CLI·워커)용. Prisma 7 하이브리드 클라이언트이므로 번들링이 필요합니다.
-
-### API 클라이언트 코드 생성 (Orval)
-
-```bash
-pnpm gen:api-web     # apps/web 용 API 클라이언트 생성
-pnpm gen:api-admin   # apps/admin 용 API 클라이언트 생성
-```
-
-### 기타 유틸리티
-
-```bash
-pnpm bump-deps   # 의존성 일괄 업데이트 (react-day-picker 제외)
-pnpm bump-ui     # shadcn UI 컴포넌트 전체 업데이트
-pnpm clean       # node_modules 초기화
-```
-
-## Bootstrap (템플릿 초기 구성)
-
-이 템플릿은 모든 flavor를 포함한 상태로 배포됩니다. 프로젝트 시작 시 bootstrap 스크립트로 불필요한 앱/패키지를 프루닝해 원하는 구성만 남길 수 있습니다.
-
-| 명령 | Flavor | 동작 |
-| --- | --- | --- |
-| `pnpm bootstrap` | Next 풀스택 | `apps/api`·`apps/storybook`·`apps/frontend` 삭제 |
-| `pnpm bootstrap:front` | 프론트엔드 단독(RR7) | `packages/database`를 포함한 나머지 전부 삭제, `design-system` + 전이 의존성만 유지 |
-| `pnpm bootstrap:separate` | frontend + api(Fastify) | `apps/web`·`apps/admin`·`apps/storybook` 삭제 |
-| `pnpm bootstrap:flutter` | 모바일(Flutter) + api | `apps/mobile`·`apps/api`·`apps/email`·`packages/upload` + 전이 의존성(`database`·`email`·`typescript-config`)만 유지, 나머지 전부 삭제 |
-
-> ⚠️ **파괴적 작업**: 디렉터리를 실제로 삭제합니다. 안전장치로 `--dry-run`(미리보기) / `--yes`(확인 생략) / `--force` 옵션과 git-dirty 가드를 제공합니다. 실행 후 스크립트는 자기 자신을 제거합니다.
-
-## 컨테이너 이미지 (Docker)
-
-`apps/web` · `apps/frontend` · `apps/api` 에 각각 Dockerfile이 상주합니다. bootstrap 프루닝을 거치면 해당 flavor의 앱만 남으므로, **살아남은 Dockerfile이 곧 그 flavor의 배포 대상**입니다.
-
-| Flavor | 남는 Dockerfile | 배포 대상 | 포트 |
-| --- | --- | --- | --- |
-| `default` | `apps/web` | `apps/web` | 3000 |
-| `front` | `apps/frontend` | `apps/frontend` | 3000 |
-| `separate` | `apps/frontend`, `apps/api` | `apps/frontend`(화면) | 3000 / 3002 |
-| `flutter` | `apps/api` | `apps/api` | 3002 |
-| — | 없음 | **`apps/admin` 미지원** | — |
-
-**빌드 컨텍스트는 항상 저장소 루트**(`pnpm-lock.yaml`이 있는 디렉터리)입니다.
-
-```bash
-docker build --platform=linux/amd64 -f apps/web/Dockerfile -t omniseed-web .
-docker run --rm -p 3000:3000 omniseed-web
-```
-
-- 포트는 이미지에 고정되어 있습니다(`ENV PORT` == `EXPOSE` == 앱 기본 포트). 배포 플랫폼이 런타임 env를 주입하지 않아도 헬스체크가 통과하도록 하기 위함이며, 셋 중 하나만 바꾸면 조용히 어긋납니다. `apps/frontend`의 **개발 서버는 3003**이지만 **이미지는 3000**입니다(`react-router-serve` 기준) — 위 표의 포트는 컨테이너 기준입니다.
-- `apps/web`은 `output: "standalone"`으로 빌드되므로 로컬에서 프로덕션 동작을 확인할 때는 `pnpm start`(= `next start`, 경고가 납니다) 대신 `node apps/web/.next/standalone/apps/web/server.js`를 사용하세요. Vercel 빌드에서는 standalone이 꺼지므로 기존 배포는 영향을 받지 않습니다.
-- `apps/web/app/api/health/route.ts`는 **존재만으로 헬스 프로브 대상 경로를 `/` → `/api/health`로 바꿉니다**(Next.js 관례 경로 자동추론). 옮기거나 지우면 대상이 조용히 되돌아가므로 주의하세요.
-- 런타임 스테이지에는 시크릿이 들어가지 않습니다. `prisma generate`가 값 없는 `DATABASE_URL`에 throw하기 때문에 **빌드 스테이지에만** 더미 값을 넣으며(DB에 접속하지 않습니다), 런타임 스테이지로는 넘어가지 않습니다.
-
-### `apps/admin`에 Dockerfile이 없는 이유
-
-시크릿 문제가 아니라 **구조적 제약**입니다. admin은 `proxy.ts` + NextAuth `authorized` 콜백 때문에 `/` 요청이 로그인으로 **307 리다이렉트**됩니다. 컨테이너 배포 플랫폼의 헬스 프로브는 `redirect: "manual"` + `response.ok` 로 판정하므로 **3xx는 실패**로 집계되고, 인증을 통과할 방법이 없는 미리보기 환경에서는 어떤 Dockerfile을 써도 배포가 성립하지 않습니다. 의도된 미지원입니다.
-
-## 프로젝트 구조
-
-```
-omniseed/
-├── apps/                  # 실행 가능한 애플리케이션
-│   ├── web/               # 사용자용 웹 앱 (Next.js, port 3000)
-│   ├── admin/             # 어드민 앱 (Next.js, port 3001)
-│   ├── api/               # 백엔드 API (Fastify v5, port 3002)
-│   ├── frontend/          # 프론트엔드 앱 (React Router v7, port 3003)
-│   ├── mobile/            # 모바일 앱 (Flutter/Dart, dio + Riverpod)
-│   ├── email/             # 이메일 템플릿 (React Email)
-│   └── storybook/         # 컴포넌트 문서 (port 6006)
-├── packages/              # 공유 패키지 (워크스페이스)
-│   ├── database/          # Prisma 스키마 및 클라이언트
-│   ├── design-system/     # shadcn 기반 UI 컴포넌트
-│   └── ...                # typescript-config 등 공통 설정
-├── turbo/                 # Turbo 제너레이터 템플릿
-├── turbo.json             # Turbo 파이프라인 설정
-├── pnpm-workspace.yaml    # 워크스페이스 정의
-├── tsconfig.json          # 루트 TS 설정
-├── tsup.config.ts         # 라이브러리 번들 설정
-├── eslint.config.mjs      # ESLint 플랫 설정
-├── .prettierrc            # Prettier 설정
-└── package.json           # 루트 스크립트 및 의존성
-```
-
-## 워크스페이스 규칙
-
-- 공통 TypeScript 설정은 `@repo/typescript-config` 워크스페이스 패키지를 참조합니다.
-- React 타입 버전은 `pnpm.overrides`로 `@types/react@19.2.7`, `@types/react-dom@19.2.3` 고정.
-- 일부 네이티브 빌드 의존성(`@prisma/engines`, `@swc/core`, `esbuild`, `sharp` 등)은 `ignoredBuiltDependencies`로 빌드 스킵 처리되어 있습니다.
-
-## 기여
-
-1. 새 브랜치 생성 후 작업
-2. `pnpm lint && pnpm format:check` 통과 확인
-3. PR 생성 — Auto 기반 변경 이력/릴리스 자동화가 적용됩니다.
+- 고객에게서 성명·주민등록번호·증빙 파일·금융기관 인증정보를 받지 않습니다. 공유·이미지·로그에도 넣지 않습니다.
+- 공유 토큰과 인증 토큰은 난수이고 DB에는 SHA-256 해시만 저장합니다. 없는 토큰과 만료된 토큰은 같은 응답입니다.
+- 운영자 인증 실패는 이메일·비밀번호·TOTP 중 무엇이 틀렸는지도, 계정이 있는지도 구분하지 않습니다.
+- 시세·규칙의 과거 적용 이력은 덮어쓰거나 지우지 않습니다. 변경과 감사 기록은 한 트랜잭션입니다.
+- 이미 만들어진 공유 결과는 현재 시세·규칙이 바뀌어도 재계산하지 않습니다.
+- 계산 결과는 정보 제공 목적이며 대출 승인·매입 가능을 보장하지 않습니다.
 
 ## 라이선스
 
-저장소 루트의 라이선스 파일을 참고하세요.
+MIT
