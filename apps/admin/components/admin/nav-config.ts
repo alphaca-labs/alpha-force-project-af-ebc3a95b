@@ -9,11 +9,15 @@ export type AdminNavItem = {
 };
 
 export const ADMIN_NAV: AdminNavItem[] = [
-  { key: "dashboard", label: "대시보드", icon: "dashboard", href: "/" },
-  { key: "members", label: "회원 관리", icon: "group", href: "/members", badge: "12.8K" },
-  { key: "content", label: "콘텐츠", icon: "article", href: "/content" },
-  { key: "payments", label: "결제", icon: "payments", href: "/payments" },
-  { key: "settings", label: "설정", icon: "settings", href: "/settings" },
+  {
+    key: "properties",
+    label: "매물 시세",
+    icon: "apartment",
+    href: "/properties",
+  },
+  { key: "rules", label: "대출·청약 규칙", icon: "rule", href: "/rules" },
+  { key: "admins", label: "운영자", icon: "group", href: "/admins" },
+  { key: "audit", label: "감사 기록", icon: "history", href: "/audit-logs" },
 ];
 
 export function isNavActive(href: string, pathname: string): boolean {
@@ -23,15 +27,24 @@ export function isNavActive(href: string, pathname: string): boolean {
 
 /** 라우트별 페이지 타이틀/크럼 (탑바). */
 export function pageMeta(pathname: string): { title: string; crumb: string } {
-  if (/^\/members\/[^/]+$/.test(pathname)) {
-    return { title: "회원 상세", crumb: "회원 관리 / 회원 상세" };
+  if (/^\/properties\/[^/]+\/areas\/[^/]+$/.test(pathname)) {
+    return { title: "면적 가격 상세", crumb: "매물 시세 / 면적 가격 상세" };
+  }
+  if (/^\/rules\/[^/]+$/.test(pathname)) {
+    return { title: "계산 규칙 상세", crumb: "대출·청약 규칙 / 규칙 상세" };
   }
   const map: Record<string, { title: string; crumb: string }> = {
-    "/": { title: "대시보드", crumb: "서비스 핵심 지표 한눈에 보기" },
-    "/members": { title: "회원 관리", crumb: "전체 회원 조회 및 관리" },
-    "/content": { title: "콘텐츠", crumb: "게시글 작성 및 관리" },
-    "/payments": { title: "결제", crumb: "거래 내역 및 매출 현황" },
-    "/settings": { title: "설정", crumb: "서비스 환경 설정" },
+    "/properties": {
+      title: "매물·면적 관리",
+      crumb: "단지와 면적별 가격 데이터",
+    },
+    "/rules": {
+      title: "계산 규칙 관리",
+      crumb: "대출·청약 규칙의 버전과 활성 상태",
+    },
+    "/admins": { title: "관리자 계정", crumb: "역할·상태·초대 관리" },
+    "/audit-logs": { title: "감사 로그", crumb: "운영 데이터 변경 이력" },
+    "/access-denied": { title: "접근 권한 없음", crumb: "" },
   };
-  return map[pathname] ?? { title: "omniseed", crumb: "" };
+  return map[pathname] ?? { title: "뭐해야집사냐 운영", crumb: "" };
 }

@@ -2,7 +2,6 @@ import { DesignSystemProvider } from "@repo/design-system";
 import { pretendard, robotoMono } from "@repo/design-system/lib/fonts";
 import { cn } from "@repo/design-system/lib/utils";
 import "./styles.css";
-import { auth } from "@/auth";
 import Providers from "@/providers/provider";
 import type { ReactNode } from "react";
 
@@ -12,9 +11,7 @@ type RootLayoutProperties = {
 
 export const dynamic = "force-dynamic";
 
-export default async function RootLayout({ children }: RootLayoutProperties) {
-  const session = await auth();
-
+export default function RootLayout({ children }: RootLayoutProperties) {
   return (
     <html
       lang="ko"
@@ -32,7 +29,7 @@ export default async function RootLayout({ children }: RootLayoutProperties) {
         />
       </head>
       <body>
-        <Providers session={session}>
+        <Providers>
           <DesignSystemProvider forcedTheme="light" enableSystem={false}>
             {children}
           </DesignSystemProvider>

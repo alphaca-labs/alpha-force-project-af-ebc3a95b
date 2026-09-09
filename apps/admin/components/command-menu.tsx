@@ -38,7 +38,7 @@ export function CommandMenu() {
               onSelect={() => runCommand(() => router.push(item.href))}
             >
               <MaterialSymbol name={item.icon} size={18} />
-              {item.label}
+              <span>{item.label}</span>
             </CommandItem>
           ))}
         </CommandGroup>

@@ -1,48 +1,33 @@
-import { Suspense } from "react";
-import LoginForm from "@/components/form/login-form";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { LoginForm } from "@/components/auth/login-form";
+import { readPrincipal } from "@/lib/auth/session";
 
-export default function LoginPage() {
+export const dynamic = "force-dynamic";
+
+/** ADM-P01 — 관리자 로그인. */
+export default async function LoginPage() {
+  const principal = await readPrincipal();
+  if (principal) {
+    if (principal.status === "SETUP_REQUIRED" || !principal.mfaEnabled)
+      redirect("/login/setup");
+    if (!principal.mfaSatisfied) redirect("/login/challenge");
+    redirect("/properties");
+  }
   return (
-    <div className="grid min-h-screen bg-surface lg:grid-cols-[1.05fr_0.95fr]">
-      {/* Brand panel */}
-      <div className="hidden flex-col justify-between bg-foreground px-[60px] py-14 text-n-95 lg:flex">
-        <div className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-[9px] bg-background text-[19px] font-extrabold text-foreground">
-            O
-          </span>
-          <span className="text-[20px] font-bold tracking-[-0.02em]">
-            omniseed
-          </span>
-        </div>
-        <div>
-          <div className="mb-5 font-mono text-[12px] uppercase tracking-[0.12em] text-n-60">
-            Admin Console
-          </div>
-          <h1 className="m-0 max-w-[13ch] text-[40px] font-semibold leading-[1.18] tracking-[-0.025em]">
-            서비스 운영을
-            <br />한 곳에서.
-          </h1>
-          <p className="mt-[18px] max-w-[34ch] text-[15px] leading-relaxed text-n-80">
-            회원, 콘텐츠, 결제 데이터를 실시간으로 확인하고 관리하세요.
-          </p>
-        </div>
-        <div className="font-mono text-[12px] text-n-60">
-          © 2026 omniseed · v2.0
-        </div>
+    <AuthShell
+      code="ADM-P01"
+      title="관리자 로그인"
+      description="승인된 관리자 계정으로 운영 도구에 접속합니다."
+    >
+      <LoginForm />
+      <div className="mt-4 flex items-center justify-between text-[12.5px] text-n-50">
+        <Link href="/forgot-password" className="underline underline-offset-4">
+          비밀번호 찾기
+        </Link>
+        <span>반복 실패 시 잠시 잠깁니다</span>
       </div>
-
-      {/* Form panel */}
-      <div className="flex items-center justify-center p-10">
-        <div className="w-full max-w-[360px]">
-          <h2 className="mb-1.5 text-[26px] font-semibold tracking-[-0.02em]">
-            로그인
-          </h2>
-          <p className="mb-8 text-[14px] text-n-30">관리자 계정으로 접속하세요.</p>
-          <Suspense fallback={<div className="text-n-50">로딩 중…</div>}>
-            <LoginForm />
-          </Suspense>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

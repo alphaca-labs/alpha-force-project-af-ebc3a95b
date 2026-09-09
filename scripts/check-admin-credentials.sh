@@ -12,7 +12,9 @@
 #   - 남은 줄에서 login/password 계열 식별자와 따옴표 리터럴의 등호 비교를 찾으면 실패한다.
 set -uo pipefail
 
-targets=$(git ls-files 'apps/admin/**/auth.ts' 'apps/admin/auth.ts' 2>/dev/null | sort -u)
+# 인증 코드가 `auth.ts` 한 파일에서 `lib/auth/` 모듈로 옮겨졌다. 두 배치를 모두 본다 —
+# 파일 이름만 보고 검사하면 이름을 바꾸는 순간 게이트가 조용히 0건이 된다.
+targets=$(git ls-files 'apps/admin/**/auth.ts' 'apps/admin/auth.ts' 'apps/admin/lib/auth/*.ts' 2>/dev/null | sort -u)
 if [ -z "$targets" ]; then
   echo "apps/admin 인증 파일이 없습니다 — 검사 대상 없음."
   exit 0
@@ -20,6 +22,8 @@ fi
 
 status=0
 for file in $targets; do
+  # 인덱스에는 남아 있지만 워킹트리에서 지워진 경로가 있을 수 있다(리네임 직후).
+  [ -f "$file" ] || continue
   hits=$(grep -nE '.*' "$file" \
     | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)' \
     | grep -vE 'typeof' \
