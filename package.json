@@ -1,5 +1,5 @@
 {
-  "name": "omniseed",
+  "name": "zipsanya",
   "version": "0.0.2",
   "scripts": {
     "build": "turbo build",
@@ -13,6 +13,10 @@
     "bump-deps": "npx npm-check-updates --deep -u -x react-day-picker && pnpm install",
     "bump-ui": "npx shadcn@latest add --all --overwrite -c packages/design-system",
     "migrate": "cd packages/database && npx prisma format && npx prisma generate && npx prisma db push",
+    "db:seed": "pnpm --filter @repo/database seed",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "smoke": "node scripts/smoke.mjs",
     "studio": "cd packages/database && NODE_TLS_REJECT_UNAUTHORIZED=0 npx prisma studio",
     "clean": "git clean -xdf node_modules",
     "gen:api-web": "cd apps/web && pnpm orval --config ./orval.config.ts",
@@ -33,7 +37,8 @@
     "tsup": "^8.5.1",
     "turbo": "^2.6.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.2"
+    "typescript-eslint": "^8.57.2",
+    "pg": "^8.16.3"
   },
   "engines": {
     "node": ">=24"
