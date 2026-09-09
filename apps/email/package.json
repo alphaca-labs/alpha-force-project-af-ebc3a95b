@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "email build",
+    "build": "echo 'apps/email: React Email 미리보기 서버는 로컬 dev 전용이라 공용 build 대상이 아니다 (사유는 README 참조)'",
     "dev": "email dev --port 3003",
     "export": "email export",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false",
+    "build:preview": "email build"
   },
   "dependencies": {
     "@react-email/components": "1.0.1",
