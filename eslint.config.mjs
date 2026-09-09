@@ -8,6 +8,12 @@ export default [
   {
     ignores: [
       "**/node_modules/",
+      // 산출물 경계 — 이 저장소의 워크트리 루트가 곧 프로젝트 루트라 `outputs/**` 가
+      // 루트 글롭 안에 들어온다. Alpha Force 실행 산출물·인계 데이터는 제품 소스가
+      // 아니므로 루트 `eslint .` 대상에서 제외한다. ESLint 9 flat config 는
+      // `.eslintignore` 도 `.gitignore` 도 읽지 않으므로 반드시 여기에 적어야 한다.
+      "outputs/",
+      ".alpha-force/",
       "**/.next/",
       "**/.turbo/",
       "**/dist/",
@@ -34,10 +40,7 @@ export default [
   //    falls back to the base JS + typescript-eslint rules above.
   ...nextCoreWebVitals.map((config) => ({
     ...config,
-    files: [
-      "apps/web/**/*.{ts,tsx,js,jsx}",
-      "apps/admin/**/*.{ts,tsx,js,jsx}",
-    ],
+    files: ["apps/web/**/*.{ts,tsx,js,jsx}", "apps/admin/**/*.{ts,tsx,js,jsx}"],
   })),
 
   // 4a. Fastify app (apps/api) runs on Node. It gets the base JS +
@@ -69,6 +72,8 @@ export default [
 
   // 4a-iii. Node ESM scripts under scripts/**. Globals declared inline to
   //         avoid adding the `globals` dependency.
+  //         Node 18+ 는 fetch/WebSocket/Response/AbortController 를 전역으로 제공한다 —
+  //         빠뜨리면 스모크 스크립트가 통째로 `no-undef` 로 걸린다.
   {
     files: ["scripts/**/*.{js,mjs,cjs}"],
     languageOptions: {
@@ -80,6 +85,14 @@ export default [
         global: "readonly",
         URL: "readonly",
         URLSearchParams: "readonly",
+        fetch: "readonly",
+        Response: "readonly",
+        Request: "readonly",
+        Headers: "readonly",
+        WebSocket: "readonly",
+        AbortController: "readonly",
+        TextDecoder: "readonly",
+        TextEncoder: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
         setInterval: "readonly",
@@ -110,7 +123,9 @@ export default [
       const next = { ...config, files: ["apps/frontend/**/*.{ts,tsx,js,jsx}"] };
       if (next.plugins && "@next/next" in next.plugins) {
         next.plugins = Object.fromEntries(
-          Object.entries(next.plugins).filter(([name]) => name !== "@next/next"),
+          Object.entries(next.plugins).filter(
+            ([name]) => name !== "@next/next",
+          ),
         );
       }
       if (next.rules) {
