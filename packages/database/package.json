@@ -18,7 +18,10 @@
   },
   "scripts": {
     "build": "prisma generate --no-hints",
-    "studio": "NODE_TLS_REJECT_UNAUTHORIZED=0 prisma studio"
+    "studio": "NODE_TLS_REJECT_UNAUTHORIZED=0 prisma studio",
+    "seed": "tsx prisma/seed.ts",
+    "push": "prisma db push --skip-generate",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
@@ -37,6 +40,8 @@
     "@types/ws": "^8.18.1",
     "bufferutil": "^4.0.9",
     "prisma": "7",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@repo/security": "workspace:*",
+    "tsx": "^4.20.6"
   }
 }

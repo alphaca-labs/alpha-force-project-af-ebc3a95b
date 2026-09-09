@@ -1,5 +1,8 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// 「뭐해야집사냐?」 데이터 모델 — PRD FR-006 · FR-025~037 의 저장 계약.
+//
+// 금액은 전부 **원 단위 정수**이고 JavaScript 안전 정수 범위를 넘길 수 있으므로 `BigInt` 로
+// 저장한다. 서버 경계에서 문자열 또는 number 로 변환해 내보낸다.
+// 이력이 붙은 행(시세 버전·규칙 버전·감사 기록)은 물리 삭제하지 않는다.
 
 generator client {
   provider = "prisma-client"
@@ -10,10 +13,387 @@ datasource db {
   provider = "postgresql"
 }
 
-// This is a stub model.
-// Delete it and add your own Prisma models.
-model Page {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
+// ---------------------------------------------------------------------------
+// 매물
+// ---------------------------------------------------------------------------
+
+enum HousingType {
+  APARTMENT // 아파트
+  OFFICETEL // 오피스텔
+}
+
+/// 단지. 동명 단지는 도로명 주소로 분리한다.
+model Property {
+  id        String      @id @default(cuid())
+  name      String /// 단지명
+  address   String /// 도로명 주소
+  region    String /// 시·군·구 (검색·필터 축)
+  type      HousingType /// 아파트 / 오피스텔
+  active    Boolean     @default(true) /// 비활성은 신규 검색·추천에서만 제외한다
+  featured  Boolean     @default(false) /// 추천 노출 여부 (FR-001)
+  featuredOrder Int? /// 추천 노출 순서
+  legalCode String? /// 법정동 코드 (국토교통부 수집 축)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  areas PropertyArea[]
+
+  @@unique([name, address])
+  @@index([region])
+  @@index([active, featured, featuredOrder])
+}
+
+/// 단지의 전용면적별 평형.
+model PropertyArea {
+  id         String   @id @default(cuid())
+  propertyId String
+  areaM2     Decimal  @db.Decimal(8, 2) /// 전용면적 ㎡
+  pyeong     Int /// 환산 평수(표시용)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  property     Property                @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  transactions RealEstateTransaction[]
+  snapshots    MarketPriceSnapshot[]
+  overrides    AdminPriceOverride[]
+
+  @@unique([propertyId, areaM2])
+  @@index([propertyId])
+}
+
+// ---------------------------------------------------------------------------
+// 원거래 · 시세
+// ---------------------------------------------------------------------------
+
+/// 국토교통부 실거래 원본. 같은 외부 거래 ID 는 upsert 한다(FR-025).
+model RealEstateTransaction {
+  id           String   @id @default(cuid())
+  externalId   String   @unique /// 외부 거래 식별자
+  areaId       String
+  amount       BigInt /// 거래 금액(원)
+  contractDate DateTime @db.Date /// 계약일
+  cancelled    Boolean  @default(false) /// 취소·정정 건은 시세 계산에서 제외한다
+  sourceAt     DateTime /// 원본 기준시각
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  area PropertyArea @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@index([areaId, contractDate])
+  @@index([cancelled])
+}
+
+/// 자동 정규화한 대표 시세. 버전을 덮어쓰지 않고 새 행으로 쌓는다(FR-006).
+model MarketPriceSnapshot {
+  id           String   @id @default(cuid())
+  areaId       String
+  medianPrice  BigInt /// 중위가격(원)
+  windowMonths Int /// 산정 창(6 또는 12)
+  sampleCount  Int /// 산정에 쓰인 거래 건수
+  baseDate     DateTime @db.Date /// 기준일(최근 거래일)
+  sourceLabel  String   @default("국토교통부 실거래가 공개시스템")
+  computedAt   DateTime @default(now())
+
+  area PropertyArea @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  @@index([areaId, computedAt])
+}
+
+enum VersionStatus {
+  SCHEDULED
+  ACTIVE
+  EXPIRED
+  INACTIVE
+}
+
+/// 운영자 확정 시세. 유효기간 안이면 자동 중위가격보다 우선한다(FR-006.AC3 · FR-026).
+model AdminPriceOverride {
+  id            String        @id @default(cuid())
+  areaId        String
+  price         BigInt
+  baseDate      DateTime      @db.Date
+  sourceLabel   String /// 출처(예: 운영자 확정 - 현장 시세)
+  effectiveFrom DateTime      @db.Date
+  effectiveTo   DateTime?     @db.Date
+  status        VersionStatus @default(ACTIVE)
+  memo          String?
+  createdById   String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  area      PropertyArea @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  createdBy AdminAccount @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([areaId, status, effectiveFrom])
+}
+
+// ---------------------------------------------------------------------------
+// 정책 · 규칙
+// ---------------------------------------------------------------------------
+
+enum LoanKind {
+  GENERAL    // 일반 주택담보대출
+  GOVERNMENT // 정부 지원 대출
+}
+
+/// 대출 상품. 규칙은 버전으로만 바뀐다.
+model LoanProduct {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  kind           LoanKind
+  /// 상호 배타 그룹. 같은 키를 가진 상품은 한 조달 조합에 함께 들어가지 않는다(FR-017 규칙).
+  exclusiveGroup String
+  officialSource String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  versions LoanRuleVersion[]
+}
+
+/// 대출 규칙 버전. 이미 사용된 버전은 수정하지 않고 새 버전을 만든다(FR-028).
+model LoanRuleVersion {
+  id            String        @id @default(cuid())
+  productId     String
+  version       Int
+  ltv           Decimal       @db.Decimal(4, 3) /// 0~1
+  dsr           Decimal       @db.Decimal(4, 3) /// 0~1
+  annualRateMin Decimal       @db.Decimal(6, 5)
+  annualRateMax Decimal       @db.Decimal(6, 5)
+  termYears     Int
+  maxAmount     BigInt
+  /// 자격 조건 배열. `EligibilityCondition` 형태의 JSON.
+  conditions    Json
+  /// 준비 항목 문자열 배열.
+  preparations  Json
+  effectiveFrom DateTime      @db.Date
+  effectiveTo   DateTime?     @db.Date
+  status        VersionStatus @default(ACTIVE)
+  createdById   String?
+  createdAt     DateTime      @default(now())
+
+  product   LoanProduct   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy AdminAccount? @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([productId, version])
+  @@index([status, effectiveFrom])
+}
+
+/// 청약 우대 규칙 버전(FR-016.AC3 · FR-028).
+model SubscriptionRuleVersion {
+  id             String        @id @default(cuid())
+  code           String
+  name           String
+  version        Int
+  /// 자격 조건 배열(JSON) — 대출 규칙과 같은 형태를 쓴다.
+  conditions     Json
+  preparations   Json
+  officialSource String
+  effectiveFrom  DateTime      @db.Date
+  effectiveTo    DateTime?     @db.Date
+  status         VersionStatus @default(ACTIVE)
+  createdById    String?
+  createdAt      DateTime      @default(now())
+
+  createdBy AdminAccount? @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([code, version])
+  @@index([status, effectiveFrom])
+}
+
+// ---------------------------------------------------------------------------
+// 공유 스냅숏
+// ---------------------------------------------------------------------------
+
+/// 공유 결과. URL 에는 원 토큰, DB 에는 해시만 둔다(FR-022 · FR-024).
+/// 저장된 값은 불변이며 현재 규칙이 바뀌어도 재계산하지 않는다.
+model ShareSnapshot {
+  id          String   @id @default(cuid())
+  tokenHash   String   @unique /// SHA-256(원 토큰). 원 토큰은 저장하지 않는다.
+  /// 같은 지문이면 기존 URL 을 재사용한다(FR-022.AC3).
+  fingerprint String
+  /// 생성 당시의 입력·시세·규칙·결과·로드맵 요약 전체(JSON). 민감 식별 정보는 넣지 않는다.
+  payload     Json
+  createdAt   DateTime @default(now())
+
+  @@index([fingerprint])
+}
+
+// ---------------------------------------------------------------------------
+// 운영자 · 보안 · 감사
+// ---------------------------------------------------------------------------
+
+enum AdminRole {
+  OWNER    // 전체 권한
+  OPERATOR // 시세·규칙 운영
+  VIEWER   // 읽기 전용
+}
+
+enum AdminStatus {
+  SETUP_REQUIRED // 최초 로그인 전(비밀번호 교체 + TOTP 등록 필요)
+  ACTIVE
+  INACTIVE
+}
+
+/// 운영자 계정. 공개 가입은 없고 초대로만 늘어난다(FR-033).
+model AdminAccount {
+  id             String      @id @default(cuid())
+  email          String      @unique
+  name           String
+  /// 비밀번호 해시. 알고리즘 식별자를 포함한 self-describing 문자열.
+  passwordHash   String
+  role           AdminRole   @default(OPERATOR)
+  status         AdminStatus @default(SETUP_REQUIRED)
+  /// TOTP 등록 완료 여부. false 면 관리 데이터에 접근할 수 없다(FR-030 · FR-036).
+  mfaEnabled     Boolean     @default(false)
+  /// 세션 일괄 무효화용 버전. 비밀번호/TOTP 변경·비활성화 시 올린다(FR-031).
+  sessionVersion Int         @default(1)
+  lastLoginAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  mfa            AdminMfaCredential?
+  sessions       AdminSession[]
+  invitationsSent AdminInvitation[]     @relation("InvitedBy")
+  resetTokens    PasswordResetToken[]
+  auditLogs      AuditLog[]
+  priceOverrides AdminPriceOverride[]
+  loanRules      LoanRuleVersion[]
+  subscriptionRules SubscriptionRuleVersion[]
+}
+
+/// TOTP 자격 증명. secret 은 암호화해 저장하고 원문·QR seed 를 다시 보여 주지 않는다.
+model AdminMfaCredential {
+  id              String    @id @default(cuid())
+  adminId         String    @unique
+  encryptedSecret String /// AES-256-GCM(iv:tag:ciphertext)
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  admin AdminAccount @relation(fields: [adminId], references: [id], onDelete: Restrict)
+}
+
+enum SessionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+/// 운영자 세션. idle 30분 · absolute 12시간을 서버 시각으로만 판정한다.
+model AdminSession {
+  id             String        @id @default(cuid())
+  adminId        String
+  tokenHash      String        @unique
+  status         SessionStatus @default(ACTIVE)
+  /// TOTP 를 마쳤는지. false 면 관리 데이터에 접근할 수 없다.
+  mfaSatisfied   Boolean       @default(false)
+  sessionVersion Int
+  issuedAt       DateTime      @default(now())
+  lastSeenAt     DateTime      @default(now())
+  absoluteExpiresAt DateTime
+  revokedAt      DateTime?
+  userAgent      String?
+
+  admin AdminAccount @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, status])
+}
+
+enum TokenStatus {
+  PENDING
+  USED
+  CANCELLED
+  EXPIRED
+}
+
+/// 초대. 지정 이메일 귀속 · 일회성 · 24시간 만료(FR-033).
+model AdminInvitation {
+  id          String      @id @default(cuid())
+  email       String
+  role        AdminRole   @default(OPERATOR)
+  tokenHash   String      @unique /// 원 토큰은 저장하지 않는다
+  status      TokenStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime    @default(now())
+
+  invitedBy AdminAccount @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([email, status])
+}
+
+/// 비밀번호 재설정 토큰(FR-035).
+model PasswordResetToken {
+  id        String      @id @default(cuid())
+  adminId   String
+  tokenHash String      @unique
+  status    TokenStatus @default(PENDING)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime    @default(now())
+
+  admin AdminAccount @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, status])
+}
+
+/// 인증 시도. 반복 실패에 점진 제한을 걸기 위한 축(FR-030 · FR-035).
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  /// 제한 축(이메일 해시 또는 요청 출처 해시). 원문 이메일을 남기지 않는다.
+  axis      String
+  kind      String /// PASSWORD | TOTP | RESET_REQUEST
+  succeeded Boolean
+  createdAt DateTime @default(now())
+
+  @@index([axis, kind, createdAt])
+}
+
+/// 감사 기록. 수정·삭제하지 않는다. 제품 변경과 같은 트랜잭션에서 성공해야 한다(FR-029).
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminId    String?
+  actorEmail String /// 기록 시점의 행위자 표기(계정이 지워져도 남는다)
+  action     String /// PRICE_OVERRIDE_SAVED, RULE_VERSION_CREATED, ADMIN_INVITED, ...
+  targetType String
+  targetId   String
+  /// 변경 전후 값. 비밀번호·토큰·TOTP secret 은 절대 넣지 않는다.
+  before     Json?
+  after      Json?
+  requestId  String
+  createdAt  DateTime @default(now())
+
+  admin AdminAccount? @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([targetType, targetId])
+}
+
+enum IngestionStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// 국토교통부 증분 수집 실행 기록. 실패해도 기존 유효 시세를 지우지 않는다(FR-025).
+model IngestionRun {
+  id             String          @id @default(cuid())
+  /// 재개 지점. 실패 시 이 값을 보존해 같은 구간부터 다시 시작한다.
+  cursor         String
+  rangeFrom      DateTime        @db.Date
+  rangeTo        DateTime        @db.Date
+  processedCount Int             @default(0)
+  createdCount   Int             @default(0)
+  correctedCount Int             @default(0)
+  failedCount    Int             @default(0)
+  status         IngestionStatus @default(RUNNING)
+  message        String?
+  startedAt      DateTime        @default(now())
+  finishedAt     DateTime?
+
+  @@index([status, startedAt])
 }
