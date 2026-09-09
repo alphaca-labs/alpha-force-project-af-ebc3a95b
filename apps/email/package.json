@@ -1,0 +1,27 @@
+{
+  "name": "email",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'apps/email: React Email 미리보기 서버는 로컬 dev 전용이라 공용 build 대상이 아니다 (사유는 README 참조)'",
+    "dev": "email dev --port 3003",
+    "export": "email export",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false",
+    "build:preview": "email build"
+  },
+  "dependencies": {
+    "@react-email/components": "1.0.1",
+    "@repo/email": "workspace:*",
+    "react": "19.2.3",
+    "react-email": "5.0.8"
+  },
+  "devDependencies": {
+    "@react-email/preview-server": "5.0.8",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "25.0.2",
+    "@types/react": "19.2.7",
+    "next": "16.0.10",
+    "typescript": "^5.9.3"
+  }
+}

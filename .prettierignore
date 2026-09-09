@@ -1,0 +1,26 @@
+node_modules
+.next
+.turbo
+dist
+build
+coverage
+generated
+storybook-static
+.react-email
+packages/design-system/components/ui
+packages/design-system/lib
+packages/design-system/hooks
+packages/database/generated
+pnpm-lock.yaml
+
+# Flutter app — Dart/Gradle/Xcode artifacts are formatted by `dart format`,
+# not Prettier (pubspec.yaml, web/manifest.json, ... would otherwise fail
+# `pnpm format:check`).
+apps/mobile
+
+# 산출물 경계 — Alpha Force 실행 산출물/인계 데이터(제품 소스 아님)
+outputs
+.alpha-force
+
+# PRD 원문 — 요구사항 정본이라 바이트가 바뀌면 안 된다. 포매팅 대상이 아니다.
+docs/ref/prd

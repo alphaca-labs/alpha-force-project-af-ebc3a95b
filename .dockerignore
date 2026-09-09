@@ -1,0 +1,56 @@
+# Spec: 040-omniseed-docker-flavors (G6/AC6)
+#
+# 빌드 컨텍스트는 이 파일이 있는 저장소 루트다(pnpm-lock.yaml 기준).
+# 호스트의 node_modules 를 절대 이미지로 들이지 않는다: 루트 package.json 의
+# pnpm.ignoredBuiltDependencies 에 esbuild·sharp·prisma·@swc/core 가 들어 있어
+# 호스트에서 만들어진 플랫폼 종속 바이너리가 그대로 섞이면 linux/amd64 이미지에서
+# 조용히 깨진다. 의존성은 항상 이미지 안에서 새로 설치한다.
+# 각 워크스페이스의 package.json 은 반드시 남겨야 한다(--frozen-lockfile 검증용)
+# — 그래서 디렉토리 통째 제외는 하지 않고 산출물/캐시만 제외한다.
+
+node_modules
+**/node_modules
+
+# 빌드 산출물 — 이미지 안에서 다시 만든다
+.next
+**/.next
+build
+**/build
+dist
+**/dist
+out
+**/out
+storybook-static
+**/storybook-static
+.react-router
+**/.react-router
+**/.dart_tool
+packages/database/generated
+
+# 캐시 / 로컬 도구 상태
+.turbo
+**/.turbo
+.vercel
+**/.vercel
+coverage
+**/coverage
+.git
+.github
+.vscode
+.idea
+
+# env 파일 전체 (예: packages/database/.env). `.env.example` 도 재포함하지 않는다 —
+# 빌드에 쓰이지 않는데다, 템플릿의 예시 파일에 실제 형태의 값이 들어가 있는 경우가 있고
+# api/frontend 런타임 스테이지는 워크스페이스 트리를 통째로 COPY 한다. 재포함하지 않으면
+# "런타임 이미지에 시크릿 0" 이 COPY 전략·flavor 와 무관하게 구조적으로 참이 된다.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# 개발 스캐폴딩 / 잡동사니
+.beskit
+*.log
+**/*.log
+.DS_Store
+**/.DS_Store
